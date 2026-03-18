@@ -21,3 +21,5 @@ print(prediction.conf.shape)
 print(prediction.extrinsics.shape)
 # prediction.intrinsics       : [N, 3, 3]    float32 array
 print(prediction.intrinsics.shape)
+
+
