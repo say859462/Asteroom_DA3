@@ -16,20 +16,12 @@ from PIL import Image
 from tqdm import tqdm
 from collections import defaultdict
 
-# ==========================================
-# Phase 2: 局部特徵匹配模組導入
-# 採用標準層次化導入，不使用 sys.path 修改
-# 注意：確保 ./LightGlue 資料夾內具備 __init__.py
-# ==========================================
+# 嘗試載入 LightGlue 模組 (Phase 2 局部特徵匹配)
 try:
     from LightGlue.lightglue import LightGlue, SuperPoint
     LIGHTGLUE_AVAILABLE = True
 except ImportError:
-    try:
-        from LightGlue.lightglue import LightGlue, SuperPoint
-        LIGHTGLUE_AVAILABLE = True
-    except ImportError:
-        LIGHTGLUE_AVAILABLE = False
+    LIGHTGLUE_AVAILABLE = False
 
 # 為了解決 Blackwell (12.0) 硬體不支援舊版 xformers 的問題
 # 在載入任何 torch 模組前強制禁用 xformers，切換至原生 PyTorch SDPA 運算
@@ -112,7 +104,7 @@ def extract_local_features(extractor, imgs, device):
     """
     transform = T.Compose([
         T.Resize((512, 512)),
-        T.Grayscale(num_output_channels=1),
+        T.Grayscale(num_output_channels=1),  # LightGlue 官方預設處理為單通道灰階
         T.ToTensor(),
     ])
 
@@ -140,14 +132,8 @@ def check_lightglue_match(matcher, feats_A, feats_B, threshold=15):
                 matches01 = matcher({"image0": feat_a, "image1": feat_b})
                 matches_tensor = matches01['matches']
 
-                # =========================
-                # ✅ 修正 BUG：兼容 list / tensor
-                # =========================
-                if isinstance(matches_tensor, list):
-                    num_matches = len(matches_tensor)
-                else:
-                    num_matches = matches_tensor.shape[-2]
-                # =========================
+                # 獲取配對點數量 (相容不同版本的 LightGlue 輸出張量維度)
+                num_matches = matches_tensor.shape[-2]
 
                 if num_matches > max_matches:
                     max_matches = num_matches
@@ -193,7 +179,7 @@ def check_depth_consistency(u_proj, v_proj, z_proj, target_depth_map, tolerance=
     return not_occluded_mask
 
 
-# [內部輔助函式] 將原來的 evaluate_connectivity 核心邏輯封裝為單向驗證
+# [新增輔助函式] 將原來的 evaluate_connectivity 核心邏輯封裝為單向驗證
 def _project_and_verify_single_direction(prediction_pose, pers_idx_A, pers_idx_B, query_grid_size=(20, 20), conf_threshold=0.5, depth_mode="relative_only", prediction_metric=None, occlusion_tolerance=0.20):
     """
     原 evaluate_connectivity 的核心邏輯，執行單向投影 (A -> B)，並回傳「視角重疊比例」。
@@ -365,7 +351,6 @@ def evaluate_connectivity(prediction_pose, pers_idx_A, pers_idx_B, overlap_thres
     - overlap_threshold (float): 判定為連通的最低視野重疊率門檻。預設 0.05 代表至少有 5% 的點能在目標空間中被觀測到。
     - query_grid_size (Tuple[int, int]): 來源視圖上均勻撒點的網格維度 (X, Y)。預設 (20, 20) 可確保產生 400 個解析度獨立的查詢點，維持效能穩定。
     - conf_threshold (float): 深度預測的最低信心度門檻。預設為 0.5，用於剔除模糊或反光區域的不穩定深度值，以提升幾何重投影的精準度。
-
     - depth_mode (str): 選擇深度推論模式 ("relative_only", "hybrid")。
     - prediction_metric (Prediction): 僅在 "hybrid" 模式下提供，負責提供真實尺度的深度。
     - occlusion_tolerance (float): [新增參數] 深度驗證容差，預設已放寬至 0.20。
@@ -381,26 +366,17 @@ def evaluate_connectivity(prediction_pose, pers_idx_A, pers_idx_B, overlap_thres
 
     if use_bidirectional:
         # 2. 執行 B -> A 投影 (反向驗證)
-        overlap_B2A, best_vis_B2A = _project_and_verify_single_direction(
+        overlap_B2A, _ = _project_and_verify_single_direction(
             prediction_pose, pers_idx_B, pers_idx_A, query_grid_size, conf_threshold, depth_mode, prediction_metric, occlusion_tolerance
         )
-
-        # [Soft-Voting] 使用雙向重疊率的平均值來判定，而非布林 AND
-        # 這樣可以補償某些角度因為遮擋或位姿估計誤差導致的單向失敗，提高召回率 (Recall)
-        combined_overlap = (overlap_A2B + overlap_B2A) / 2.0
-        is_connected = combined_overlap > overlap_threshold
-
-        # 為了視覺化，自動選擇匹配點數較多、最清晰的方向
-        if best_vis_B2A['count'] > best_vis_A2B['count']:
-            best_vis = best_vis_B2A
-        else:
-            best_vis = best_vis_A2B
+        # 3. 嚴格判定：兩個方向的視野重疊率都必須大於重疊門檻，才能判定為真連通
+        is_connected = (overlap_A2B > overlap_threshold) and (
+            overlap_B2A > overlap_threshold)
     else:
         # 單向判定 (退回舊版邏輯)
         is_connected = (overlap_A2B > overlap_threshold)
-        best_vis = best_vis_A2B
 
-    return is_connected, best_vis
+    return is_connected, best_vis_A2B
 
 
 def evaluate_single_house(dataset_root, house_csv_path, model_pose, device="cuda", query_grid_size=(20, 20), conf_threshold=0.5, depth_mode="relative_only", model_metric=None, output_dir="./Plots", export_depth=False, depth_out_dir="./Depth_Visuals", semantic_threshold=0.3, use_semantic=True, use_bidirectional=True, use_lightglue=True, lightglue_threshold=15, **kwargs):
@@ -409,32 +385,21 @@ def evaluate_single_house(dataset_root, house_csv_path, model_pose, device="cuda
     【架構變更】: 三級漏斗過濾架構 (3-Stage Funnel)
     Phase 1 (Global Semantic): DINOv2 全域相似度預篩選 (閾值極度放寬，擋掉最離譜配對)
     Phase 2 (Local Geometric): LightGlue 局部特徵匹配 (防禦白牆與 DA3 幾何幻覺)
-    Phase 3 (3D Pose & Depth) : DA3 幾何投影與 Soft-Voting 驗證
+    Phase 3 (3D Pose & Depth) : DA3 幾何投影與遮擋驗證
 
     【參數說明】
-    - dataset_root (str | Path): 資料集的根目錄路徑，用於解析圖片相對路徑。
-    - house_csv_path (str | Path): 記錄該棟房屋測試配對與真實連通性標籤 (Ground Truth) 的 CSV 檔案路徑。
-    - model_pose (DepthAnything3): 已初始化並載入權重的 DA3 模型實例。
-    - device (str): 模型與張量運算所使用的硬體設備，預設為 "cuda"。
-    - query_grid_size (Tuple[int, int]): 控制連通性驗證時的撒點密度，預設為 (20, 20)。
-    - conf_threshold (float): 控制擷取 Query Point 的最低信心度門檻。
-    - depth_mode (str): 控制深度推論模式 ("relative_only", "hybrid")。
-    - model_metric (DepthAnything3): 當選擇 "hybrid" 模式時，需傳入的 Metric 深度模型。
-    - output_dir (str): 視覺化圖片輸出的根目錄路徑。
-    - export_depth (bool): 是否匯出深度圖視覺化。
-    - depth_out_dir (str): 深度圖輸出的根目錄。
-    - semantic_threshold (float): Phase 1 語義篩選門檻。
+    ...
     - use_semantic (bool): [消融實驗] 是否啟用 Phase 1 (DINOv2)
     - use_lightglue (bool): [消融實驗] 是否啟用 Phase 2 (LightGlue)
     - use_bidirectional (bool): [消融實驗] 是否啟用雙向幾何驗證
-    - **kwargs: 接收已廢棄的 window_size 等參數以相容舊版 CLI 呼交。
     """
     start_time = time.time()  # 計算花費時間
 
     # 防呆機制：若使用者未安裝 lightglue 卻啟用了該功能，自動退回降級模式
     global LIGHTGLUE_AVAILABLE
     if use_lightglue and not LIGHTGLUE_AVAILABLE:
-        print("\n[警告] LightGlue 模組導入失敗！請確認 ./LightGlue 資料夾內具備 __init__.py")
+        print("\n[警告] 未偵測到 lightglue 套件！請先執行: pip install lightglue")
+        print(">> 已自動為您停用 Phase 2 (LightGlue) 局部匹配機制...\n")
         use_lightglue = False
 
     dataset_dir = Path(dataset_root)
@@ -476,10 +441,10 @@ def evaluate_single_house(dataset_root, house_csv_path, model_pose, device="cuda
             'facebookresearch/dinov2', 'dinov2_vitl14').to(device).eval()
 
     if use_lightglue:
-        print(">>> 載入局部特徵提取器 (SuperPoint)...")
+        print(">>> 載入外部 SuperPoint 模型進行局部角點特徵快取...")
         extractor = SuperPoint(max_num_keypoints=2048).eval().to(device)
 
-    # 2. 預處理：統一生成透視圖並預算特徵 (O(N))
+    # 2. 預處理：統一生成透視圖並預算語義特徵 (O(N))
     print(f"\n--- 開始處理房屋：{house_id} ---")
     for pano_rel_path in tqdm(unique_panos, desc="Preprocessing All Panos"):
         pano_full_path = dataset_dir / pano_rel_path
@@ -516,7 +481,7 @@ def evaluate_single_house(dataset_root, house_csv_path, model_pose, device="cuda
     if use_lightglue:
         matcher = LightGlue(features='superpoint').eval().to(device)
 
-    # [統計變數] 新增對 Recall 評估的詳細統計
+    # 統計變數
     total_correct, total_samples = 0, 0
     true_positives, true_negatives = 0, 0
     false_positives, false_negatives = 0, 0
@@ -526,12 +491,11 @@ def evaluate_single_house(dataset_root, house_csv_path, model_pose, device="cuda
     lightglue_rejected_count = 0
 
     # 3. 驗證連通性配對
-    print("驗證連通性配對 (3-Stage Funnel with Soft-Voting)...")
+    print("驗證連通性配對 (3-Stage Funnel Evaluation)...")
     for row in tqdm(rows, desc="Evaluating Pairs"):
         pA, pB = row['Image_A'], row['Image_B']
         ground_truth = int(row['Is_Connected'])
 
-        # 統計真實標籤分佈
         if ground_truth == 1:
             total_gt_connected += 1
         else:
@@ -549,30 +513,46 @@ def evaluate_single_house(dataset_root, house_csv_path, model_pose, device="cuda
             'pts_A': np.empty((0, 2)), 'pts_B': np.empty((0, 2))
         }
 
-        vis_idx_A, vis_idx_B = 0, 6
-        imgs_A, imgs_B = pano_imgs_cache[pA], pano_imgs_cache[pB]
-        vis_imgs_ref = imgs_A + imgs_B
-        panoA_name, panoB_name = Path(pA).stem, Path(pB).stem
+        vis_idx_A = 0
+        vis_idx_B = 6
 
+        imgs_A = pano_imgs_cache[pA]
+        imgs_B = pano_imgs_cache[pB]
+        vis_imgs_ref = imgs_A + imgs_B
+
+        panoA_name = Path(pA).stem
+        panoB_name = Path(pB).stem
+
+        # ========================================================
         # Phase 1: DINOv2 全域語義篩選 (垃圾桶防線)
+        # ========================================================
         if use_semantic:
-            feat_A, feat_B = pano_features_cache[pA], pano_features_cache[pB]
+            feat_A = pano_features_cache[pA]
+            feat_B = pano_features_cache[pB]
             is_passed, max_sim = check_semantic_similarity_fast(
                 feat_A, feat_B, threshold=semantic_threshold)
             sim_csv_rows.append(
                 [panoA_name, panoB_name, ground_truth, f"{max_sim:.4f}"])
+
             if not is_passed:
                 rejected_phase = 1
 
-        # Phase 2: LightGlue 局部特徵匹配 (防禦白牆與 DA3 幾何幻覺)
+        # ========================================================
+        # Phase 2: LightGlue 局部特徵匹配 (防白牆與異質場景幻覺)
+        # ========================================================
         if is_passed and use_lightglue:
-            feat_A_l, feat_B_l = pano_local_features_cache[pA], pano_local_features_cache[pB]
+            feat_A_local = pano_local_features_cache[pA]
+            feat_B_local = pano_local_features_cache[pB]
+
             is_passed, max_matches = check_lightglue_match(
-                matcher, feat_A_l, feat_B_l, threshold=lightglue_threshold)
+                matcher, feat_A_local, feat_B_local, threshold=lightglue_threshold)
+
             if not is_passed:
                 rejected_phase = 2
 
-        # Phase 3: DA3 幾何與深度驗證 (最終決策 - 使用 Soft-Voting)
+        # ========================================================
+        # Phase 3: DA3 幾何與深度驗證 (最終決策)
+        # ========================================================
         if is_passed:
             idx_A, idx_B = list(range(0, 6)), list(range(6, 12))
 
@@ -589,14 +569,17 @@ def evaluate_single_house(dataset_root, house_csv_path, model_pose, device="cuda
                     house_geometries[pB] = {
                         "depth": pred_pose.depth[6:12], "orig": pred_pose.processed_images[6:12]}
 
-            # 呼叫支援 Soft-Voting 的雙向校驗
             is_conn_bool, raw_vis_data = evaluate_connectivity(
                 pred_pose, idx_A, idx_B, depth_mode=depth_mode, prediction_metric=pred_metric,
                 occlusion_tolerance=0.20, use_bidirectional=use_bidirectional)
 
             is_connected_pred = 1 if is_conn_bool else 0
-            vis_data.update(raw_vis_data)
-            vis_idx_A, vis_idx_B = vis_data['idx_A'], vis_data['idx_B']
+
+            vis_data['pts_A'] = raw_vis_data['pts_A']
+            vis_data['pts_B'] = raw_vis_data['pts_B']
+            vis_data['count'] = raw_vis_data['count']
+            vis_idx_A = raw_vis_data['idx_A']
+            vis_idx_B = raw_vis_data['idx_B']
 
         else:
             # 統計被提早攔截的數量
@@ -604,10 +587,12 @@ def evaluate_single_house(dataset_root, house_csv_path, model_pose, device="cuda
                 semantic_rejected_count += 1
             elif rejected_phase == 2:
                 lightglue_rejected_count += 1
+
             is_connected_pred = 0
 
-        # [修改邏輯] 處理統計數據 (以 Recall 導向詳細分類)
+        # 處理統計數據 (以 Recall 導向詳細分類)
         is_correct = (is_connected_pred == ground_truth)
+        do_visualize = True
         pred_type = ""
 
         if is_correct:
@@ -627,43 +612,54 @@ def evaluate_single_house(dataset_root, house_csv_path, model_pose, device="cuda
                 pred_type = "FN"
 
         # 視覺化儲存
-        save_path = str(Path(output_dir) / house_id / pred_type /
-                        f"{pred_type}_{panoA_name}_vs_{panoB_name}.jpg")
-        reject_str = f" [P1 Reject: {max_sim:.2f}]" if rejected_phase == 1 else (
-            f" [P2 Reject: {max_matches}]" if rejected_phase == 2 else f" [P3 Final {'Soft-V' if use_bidirectional else 'Single'}]")
+        if do_visualize:
+            save_path = str(Path(output_dir) / house_id / pred_type /
+                            f"{pred_type}_{panoA_name}_vs_{panoB_name}.jpg")
 
-        # 若判斷為 TN 或 FN，載入原始全景圖進行視覺化，並清空投影點位
-        if pred_type in ["TN", "FN"]:
-            img_A_out = Image.open(dataset_dir / pA).convert("RGB")
-            img_B_out = Image.open(dataset_dir / pB).convert("RGB")
-            pts_A_out = np.empty((0, 2))
-            pts_B_out = np.empty((0, 2))
-        else:
-            img_A_out = vis_imgs_ref[vis_idx_A]
-            img_B_out = vis_imgs_ref[vis_idx_B]
-            pts_A_out = vis_data['pts_A']
-            pts_B_out = vis_data['pts_B']
+            # 在圖片標題清楚註記是被哪一層漏斗攔截的
+            reject_str = ""
+            if rejected_phase == 1:
+                reject_str = f" [Phase 1: DINO Sim {max_sim:.2f}]"
+            elif rejected_phase == 2:
+                reject_str = f" [Phase 2: LightGlue {max_matches} pts]"
+            else:
+                reject_str = f" [Phase 3: DA3 Passed]" if is_connected_pred else f" [Phase 3: DA3 Failed]"
 
-        save_visualization(img_A_out, img_B_out, pts_A_out, pts_B_out, save_path,
-                           title=f"GT: {ground_truth} | Pred: {is_connected_pred} ({pred_type}){reject_str} | Match: {max(0, vis_data['count'])}")
+            # 若判斷為 TN 或 FN，載入原始全景圖進行視覺化，並清空投影點位以防座標錯亂
+            if pred_type in ["TN", "FN"]:
+                img_A_out = Image.open(dataset_dir / pA).convert("RGB")
+                img_B_out = Image.open(dataset_dir / pB).convert("RGB")
+                pts_A_out = np.empty((0, 2))
+                pts_B_out = np.empty((0, 2))
+            else:
+                img_A_out = vis_imgs_ref[vis_idx_A]
+                img_B_out = vis_imgs_ref[vis_idx_B]
+                pts_A_out = vis_data['pts_A']
+                pts_B_out = vis_data['pts_B']
+
+            save_visualization(img_A_out, img_B_out,
+                               pts_A_out, pts_B_out, save_path,
+                               title=f"GT: {ground_truth} | Pred: {is_connected_pred} ({pred_type}){reject_str} | Match: {max(0, vis_data['count'])}")
 
         total_samples += 1
         torch.cuda.empty_cache()
 
-    # 導出相似度 CSV
+    # 導出相似度 CSV (僅在有啟用語義篩選且有資料時輸出)
     export_similarity_csv(sim_csv_rows, output_dir, house_id)
 
     if export_depth:
         export_house_depth_visualizations(
             house_id, house_geometries, output_base_dir=depth_out_dir)
 
-    # 計算指標
+    # 計算 Recall, Precision 與 F1-Score
     recall = (true_positives / total_gt_connected *
               100) if total_gt_connected > 0 else 0.0
     precision = (true_positives / (true_positives + false_positives)
                  * 100) if (true_positives + false_positives) > 0 else 0.0
     accuracy = (total_correct / total_samples *
                 100) if total_samples > 0 else 0.0
+
+    # 計算 F1-Score：精確率和召回率的調和平均數，防止模型靠「全猜正類」來刷高 Recall
     f1_score = (2 * precision * recall / (precision + recall)
                 ) if (precision + recall) > 0 else 0.0
 
@@ -671,20 +667,29 @@ def evaluate_single_house(dataset_root, house_csv_path, model_pose, device="cuda
 
     print("\n" + "="*55)
     print(f"房屋 {csv_path.name} 評估報告")
-    print(f"推論架構      ：3-Stage Funnel + Soft-Voting (Optimized)")
+    print(f"推論架構      ：3-Stage Funnel (Global -> Local -> Geometry)")
     print(f"深度推論模式  ：{depth_mode.upper()}")
     print(
-        f"P1 語義門檻   ：{semantic_threshold} | P2 局部門檻 : {lightglue_threshold} pts")
-    print(f"雙向驗證機制  ：{'[Soft-Voting 啟用]' if use_bidirectional else '[單向模式]'}")
+        f"P1 語義攔截   ：{'[啟用]' if use_semantic else '[停用]'} (門檻 {semantic_threshold})")
+    print(
+        f"P2 局部匹配   ：{'[啟用]' if use_lightglue else '[停用]'} (門檻 {lightglue_threshold} pts)")
+    print(f"P3 雙向驗證   ：{'[啟用]' if use_bidirectional else '[停用]'}")
     print(f"全景圖數量    ：{num_panos}")
     print(f"總測試配對數  ：{total_samples}")
     print(f"-------------------------------------------------------")
-    print(f">> Phase 1 (DINOv2) 攔截數   : {semantic_rejected_count}")
-    print(f">> Phase 2 (LightGlue) 攔截數: {lightglue_rejected_count}")
+    print(f">> P1 (DINOv2) 攔截數    : {semantic_rejected_count}")
+    print(f">> P2 (LightGlue) 攔截數 : {lightglue_rejected_count}")
+    print(f"-------------------------------------------------------")
+    print(f"真實連通配對 (GT Positives) : {total_gt_connected}")
+    print(f"真實不連通   (GT Negatives) : {total_gt_disconnected}")
+    print(f"正確預測連通 (TP)           : {true_positives}")
+    print(f"正確預測不連通 (TN)         : {true_negatives}")
+    print(f"誤判為連通 (FP - Hard/Soft) : {false_positives}")
+    print(f"漏判連通 (FN - 致命錯誤)    : {false_negatives}")
     print(f"-------------------------------------------------------")
     print(f"模型召回率 (Recall)         : {recall:.2f}%")
     print(f"模型精確率 (Precision)      : {precision:.2f}%")
-    print(f"模型 F1-Score               : {f1_score:.2f}%  <== 終極指標")
+    print(f"模型 F1-Score               : {f1_score:.2f}%  <== 終極評估指標")
     print(f"模型準確率 (Accuracy)       : {accuracy:.2f}%")
     print(f"總運算時間                  : {elapsed_time:.2f} 秒")
     out_dir_str = str(Path(output_dir) / house_id).replace("/", "\\")
@@ -696,17 +701,25 @@ def evaluate_single_house(dataset_root, house_csv_path, model_pose, device="cuda
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="DA3 連通性評估腳本 (3-Stage Funnel with Soft-Voting)")
+        description="DA3 連通性評估腳本 (3-Stage Funnel 架構)")
     parser.add_argument("--depth_mode", type=str,
                         choices=["relative_only", "hybrid"], default="relative_only")
-    parser.add_argument("--semantic_threshold", type=float,
-                        default=0.3, help="Phase 1 門檻")
-    parser.add_argument("--lightglue_threshold", type=int,
-                        default=15, help="Phase 2 門檻")
 
-    parser.add_argument("--disable_semantic", action="store_true")
-    parser.add_argument("--disable_lightglue", action="store_true")
-    parser.add_argument("--disable_bidirectional", action="store_true")
+    # Phase 1: DINOv2 全域閾值 (建議調低至 0.3，僅作為最寬鬆的防線)
+    parser.add_argument("--semantic_threshold", type=float,
+                        default=0.3, help="Phase 1 (DINOv2) 門檻")
+
+    # Phase 2: LightGlue 局部閾值 (15 代表要找到 15 個特徵角點才算過關)
+    parser.add_argument("--lightglue_threshold", type=int,
+                        default=15, help="Phase 2 (LightGlue) 匹配點數量門檻")
+
+    # 供消融實驗使用的動態開關
+    parser.add_argument("--disable_semantic", action="store_true",
+                        help="停用 Phase 1 (DINOv2) 語義相似性預篩選")
+    parser.add_argument("--disable_lightglue", action="store_true",
+                        help="停用 Phase 2 (LightGlue) 局部特徵匹配")
+    parser.add_argument("--disable_bidirectional", action="store_true",
+                        help="停用 Phase 3 (DA3) 雙向幾何驗證 (退回單向 A->B)")
 
     parser.add_argument("--dataset_root", type=str, default="./Dataset")
     parser.add_argument("--house_csv", type=str,
@@ -730,9 +743,45 @@ if __name__ == "__main__":
         model_pose=da3_pose, device=device, depth_mode=args.depth_mode,
         model_metric=da3_metric, output_dir=args.output_dir,
         export_depth=args.export_depth, depth_out_dir=args.depth_out_dir,
+
+        # 傳遞門檻與開關參數
         semantic_threshold=args.semantic_threshold,
         lightglue_threshold=args.lightglue_threshold,
         use_semantic=not args.disable_semantic,
         use_lightglue=not args.disable_lightglue,
         use_bidirectional=not args.disable_bidirectional
     )
+
+    # ---------------------------------------------------------
+    # 【未來擴充指南】如果您未來想要跑一個資料夾下所有的 CSV，只需加上這段：
+    #
+    # metadata_dir = Path(args.dataset_root) / 'Metadatas'
+    # all_csvs = list(metadata_dir.glob("*_connectivity.csv"))
+    # global_f1_sum = 0
+    # global_recall_sum = 0
+    # global_precision_sum = 0
+    # global_total_houses = 0
+    # global_time = 0.0
+    #
+    # for csv_file in all_csvs:
+    #      f1, recall, prec, acc, total, elapsed = evaluate_single_house(
+    #          args.dataset_root, csv_file, da3_pose, device,
+    #          query_grid_size=(20, 20), conf_threshold=0.5,
+    #          depth_mode=args.depth_mode, model_metric=da3_metric,
+    #          output_dir=args.output_dir,
+    #          semantic_threshold=args.semantic_threshold,
+    #          lightglue_threshold=args.lightglue_threshold,
+    #          use_semantic=not args.disable_semantic,
+    #          use_lightglue=not args.disable_lightglue,
+    #          use_bidirectional=not args.disable_bidirectional)
+    #      global_f1_sum += f1
+    #      global_recall_sum += recall
+    #      global_precision_sum += prec
+    #      global_total_houses += 1
+    #      global_time += elapsed
+    #
+    # print(f"所有房屋平均 F1-Score: {(global_f1_sum / global_total_houses):.2f}%")
+    # print(f"所有房屋平均 Recall: {(global_recall_sum / global_total_houses):.2f}%")
+    # print(f"所有房屋平均 Precision: {(global_precision_sum / global_total_houses):.2f}%")
+    # print(f"所有房屋總運算時間: {global_time:.2f} 秒")
+    # --------------------------------------------------------

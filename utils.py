@@ -68,7 +68,7 @@ def generate_perspective_imgs(pano_path, num_pers=6, fov=120.0, output_size=(512
     return pers_imgs
 
 
-def process_houses_to_individual_csv(dataset_root_path, output_dir_path, negative_ratio=1.0):
+def process_houses_to_individual_csv(dataset_root_path, output_dir_path, negative_ratio=1.0, generate_all_pairs=False):
     """
     Recursively scans for *_HOTSPOT.json files and generates an individual .csv for each house.
     Image paths are stored as RELATIVE paths (excluding the root dataset prefix).
@@ -77,7 +77,10 @@ def process_houses_to_individual_csv(dataset_root_path, output_dir_path, negativ
     Input:
     1. dataset_root_path (str or Path): The root directory of the dataset (e.g., './Dataset').
     2. output_dir_path (str or Path): The directory to store the generated .csv files.
-    3. negative_ratio (float): The ratio of negative samples to positive samples (e.g., 1.0 for 1:1).
+    3. negative_ratio (float): The ratio of negative samples to positive samples (e.g., 1.0 for 1:1). 
+                               Ignored if generate_all_pairs is True.
+    4. generate_all_pairs (bool): [新增參數] 若為 True，則會無條件輸出所有的兩兩影像配對 (No downsampling)。
+                                  這對於建構嚴謹的全面評估基準 (Comprehensive Benchmark) 非常重要。
 
     Output: 
     Saves `{House_ID}_connectivity.csv` where image paths are relative to dataset_root_path.
@@ -163,18 +166,26 @@ def process_houses_to_individual_csv(dataset_root_path, output_dir_path, negativ
             csv_rows.append([imgA, imgB, 1])
 
         # Generate negative samples (Label = 0) within the same house pool
+        # [修改邏輯] 這裡使用 itertools.combinations 產生了所有的 N * (N-1) / 2 種配對組合
         all_possible_pairs = set(
             itertools.combinations(sorted(list(all_images)), 2))
         unconnected_pairs = list(all_possible_pairs - connected_pairs)
 
-        # Calculate target negative count based on the hyperparameter
-        target_neg = int(len(connected_pairs) * negative_ratio)
-        actual_neg = min(target_neg, len(unconnected_pairs))
-
-        if actual_neg > 0:
-            sampled_neg = random.sample(unconnected_pairs, actual_neg)
-            for imgA, imgB in sampled_neg:
+        # [修改邏輯] 判斷是否需要進行負樣本的抽樣 (Downsampling)
+        if generate_all_pairs:
+            # 如果為 True，則不進行抽樣，將所有不連通的配對全數加入
+            actual_neg = len(unconnected_pairs)
+            for imgA, imgB in unconnected_pairs:
                 csv_rows.append([imgA, imgB, 0])
+        else:
+            # 否則維持原邏輯，依據 negative_ratio 進行抽樣 (適合訓練使用)
+            target_neg = int(len(connected_pairs) * negative_ratio)
+            actual_neg = min(target_neg, len(unconnected_pairs))
+
+            if actual_neg > 0:
+                sampled_neg = random.sample(unconnected_pairs, actual_neg)
+                for imgA, imgB in sampled_neg:
+                    csv_rows.append([imgA, imgB, 0])
 
         # Write to individual CSV file
         file_save_path = output_dir / f"{house_id}_connectivity.csv"
@@ -183,8 +194,9 @@ def process_houses_to_individual_csv(dataset_root_path, output_dir_path, negativ
             writer.writerow(['Image_A', 'Image_B', 'Is_Connected'])
             writer.writerows(csv_rows)
 
+        mode_str = "ALL PAIRS" if generate_all_pairs else f"Ratio {negative_ratio}"
         print(
-            f"Saved: {file_save_path.name} (Pos: {len(connected_pairs)}, Neg: {actual_neg})")
+            f"Saved: {file_save_path.name} (Pos: {len(connected_pairs)}, Neg: {actual_neg}) [{mode_str}]")
 
 
 def generate_house_graphs(dataset_root_path, output_dir_path):
@@ -385,6 +397,7 @@ def export_house_topology_json(dataset_root_path, output_dir_path):
 def export_house_depth_visualizations(house_id, geometries, output_base_dir="./Depth_Visuals"):
     """
     [優化邏輯] 接收已經推論完成的 geometries 數據，直接進行視覺化輸出，避免重複 Inference。
+    [新增功能] 將原本的 1x2 視窗擴增為 1x3，新增一張帶有 Colorbar 的真實深度矩陣圖。
 
     【參數說明】
     - house_id (str): 房屋 ID。
@@ -397,7 +410,7 @@ def export_house_depth_visualizations(house_id, geometries, output_base_dir="./D
         print(f"無可用的幾何數據，跳過深度圖導出。")
         return
 
-    print(f"\n>>> 正在輸出房屋 {house_id} 的深度預測圖 (直接利用緩存，無須二次推論)...")
+    print(f"\n>>> 正在輸出房屋 {house_id} 的深度預測圖 (包含數值 Colorbar)...")
 
     for pano_rel_path, data in tqdm(geometries.items(), desc="Saving Depth Maps"):
         pano_name = Path(pano_rel_path).stem
@@ -408,19 +421,30 @@ def export_house_depth_visualizations(house_id, geometries, output_base_dir="./D
         depth_maps = data["depth"]  # [6, H, W] float32
 
         for i in range(len(orig_imgs)):
-            fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+            # [修改邏輯] 調整為 1x3 子圖排版，擴大圖片寬度以容納三張圖
+            fig, axes = plt.subplots(1, 3, figsize=(18, 6))
 
             # 左圖：原始透視圖
             axes[0].imshow(orig_imgs[i])
             axes[0].set_title(f"Original View {i}")
             axes[0].axis('off')
 
-            # 右圖：深度圖 (正規化並套用 magma)
+            # 中圖：深度圖 (正規化並套用 magma 視覺化)
             d_min, d_max = depth_maps[i].min(), depth_maps[i].max()
             depth_norm = (depth_maps[i] - d_min) / (d_max - d_min + 1e-8)
             axes[1].imshow(depth_norm, cmap='magma')
-            axes[1].set_title("Predicted Depth Map")
+            axes[1].set_title("Normalized Depth Map")
             axes[1].axis('off')
+
+            # [新增邏輯] 右圖：未經正規化的真實深度值，並附上 Colorbar
+            # 使用 turbo 或 viridis 漸層色能更直觀分辨數值的高低差異
+            im = axes[2].imshow(depth_maps[i], cmap='turbo')
+            axes[2].set_title("Raw Depth Values")
+            axes[2].axis('off')
+
+            # 建立對應的顏色條 (Colorbar)，fraction 與 pad 用於確保 Colorbar 與圖片高度對齊
+            cbar = fig.colorbar(im, ax=axes[2], fraction=0.046, pad=0.04)
+            cbar.set_label('Depth Value', rotation=270, labelpad=15)
 
             plt.tight_layout()
             save_path = pano_save_dir / f"view_{i}.jpg"
@@ -465,9 +489,69 @@ def save_visualization(img_A, img_B, pts_A, pts_B, save_path, title=""):
     plt.close(fig)
 
 
+def detect_cycles_in_topology_jsons(topology_dir_path="./Dataset/Topology_JSONs"):
+    """
+    [新增邏輯] 讀取目錄下所有的拓樸 JSON 檔案，並檢測該房屋的空間連結圖是否存在 Cycle (環狀動線)。
+    使用 NetworkX 將 JSON 中定義的 edges 構建成無向圖，並利用 nx.cycle_basis 來精準判斷是否包含迴圈。
+    最後統計並輸出「總房屋數」、「包含 Cycle 的房屋數」及「無 Cycle 的房屋數」。
+
+    Input:
+    - topology_dir_path: 存放 topology JSON 檔案的目錄路徑。預設為 "./Dataset/Topology_JSONs"。
+    """
+    topology_dir = Path(topology_dir_path)
+    if not topology_dir.exists():
+        print(f"找不到指定的拓樸 JSON 目錄：{topology_dir}")
+        return
+
+    json_files = list(topology_dir.glob("*.json"))
+    total_houses = len(json_files)
+    houses_with_cycle = 0
+
+    if total_houses == 0:
+        print(f"在目錄 {topology_dir} 中找不到任何 JSON 檔案。")
+        return
+
+    print(f"\n--- 開始檢測空間拓樸圖 Cycle ---")
+    for json_file in tqdm(json_files, desc="Checking Cycles"):
+        try:
+            with open(json_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            # 建立無向圖
+            G = nx.Graph()
+            edges = data.get("edges", [])
+
+            # 添加連通邊界
+            for edge in edges:
+                G.add_edge(edge["source"], edge["target"])
+
+            # 使用 NetworkX 的 cycle_basis 來尋找無向圖中的環
+            # 若 cycle_basis 返回的陣列長度大於 0，代表存在至少一個迴圈
+            cycles = nx.cycle_basis(G)
+            if len(cycles) > 0:
+                houses_with_cycle += 1
+
+        except Exception as e:
+            print(f"處理檔案 {json_file.name} 時發生錯誤: {e}")
+
+    # 輸出總結報告
+    print("\n=============================================")
+    print(f"拓樸圖 Cycle 檢測報告")
+    print(f"掃描目錄          : {topology_dir}")
+    print(f"總房屋數量        : {total_houses}")
+    print(f"包含 Cycle 的房屋 : {houses_with_cycle}")
+    print(f"無 Cycle 的房屋   : {total_houses - houses_with_cycle}")
+    print("=============================================\n")
+
+
 if __name__ == "__main__":
-    # Example execution
-    # process_houses_to_individual_csv('./Dataset', './Dataset/Metadatas', negative_ratio=0.5)
+    # Example execution:
+    # 處理並產生 Connectivity CSV (已註解避免重複執行)
+    # process_houses_to_individual_csv('./Dataset', './Dataset/Metadatas', generate_all_pairs=False, negative_ratio=5.0)
+    
+    # 產生並匯出房屋拓樸圖形結構
     # generate_house_graphs('./Dataset', './Dataset/Topology_Graphs')
     # export_house_topology_json('./Dataset', './Dataset/Topology_JSONs')
-    pass
+    
+    # [新增] 執行拓樸圖的 Cycle 檢測
+    detect_cycles_in_topology_jsons('./Dataset/Topology_JSONs')
