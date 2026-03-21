@@ -5,6 +5,7 @@ from depth_anything_3.api import DepthAnything3
 device = torch.device("cuda")
 model = DepthAnything3.from_pretrained(
     "depth-anything/DA3NESTED-GIANT-LARGE-1.1")
+# model = DepthAnything3.from_pretrained("depth-anything/DA3-LARGE-1.1")
 model = model.to(device=device)
 example_path = "./Depth-Anything-3/assets/examples/SOH"
 images = sorted(glob.glob(os.path.join(example_path, "*.png")))
@@ -23,3 +24,5 @@ print(prediction.extrinsics.shape)
 print(prediction.intrinsics.shape)
 
 
+if __name__ == "__main__":
+    pass
