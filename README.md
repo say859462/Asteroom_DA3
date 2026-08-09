@@ -56,8 +56,8 @@ python -m pip install --upgrade pip
 python -m pip install -r .\requirements.txt
 ```
 
-The recorded environment is in `virtual_environment_info.txt`. The DA3-LARGE
-weights are downloaded by `DepthAnything3.from_pretrained()` on first use.
+The DA3-LARGE weights are downloaded by `DepthAnything3.from_pretrained()` on
+first use.
 
 ## Evaluate
 
