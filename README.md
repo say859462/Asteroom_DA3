@@ -1,9 +1,5 @@
 # Asteroom DA3 Connectivity Model
 
-Minimal source package for the best pairwise panorama-connectivity model. This
-repository intentionally excludes GraphRefiner, DINOv3 experiments, generated
-caches, datasets, and the separate virtual-tour application.
-
 ## Result
 
 Selected checkpoint: epoch 4, fixed threshold 0.5, fold-0 validation set with
@@ -26,8 +22,6 @@ Selected checkpoint: epoch 4, fixed threshold 0.5, fold-0 validation set with
 5. Aggregate query evidence with a one-layer Transformer and average both directional logits.
 6. Train with connectivity BCE and the original view-level HSLoc supervision.
 
-Depth, ray, DPT geometry, GraphRefiner, peak loss, and spatial-HSLoc loss are not
-part of this checkpoint.
 
 ## Files
 
@@ -47,17 +41,7 @@ splits/             Fixed fold-0 train and validation CSV files
 The panorama dataset is not included. Place it at `Dataset/` so paths in the
 split CSV files remain valid.
 
-## Environment
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -r .\requirements.txt
-```
-
-The DA3-LARGE weights are downloaded by `DepthAnything3.from_pretrained()` on
-first use.
 
 ## Evaluate
 
