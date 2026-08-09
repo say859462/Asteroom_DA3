@@ -1,0 +1,7 @@
+depth-anything-3 @ git+https://github.com/ByteDance-Seed/Depth-Anything-3.git
+matplotlib
+numpy<2
+pillow
+torch>=2
+torchvision
+tqdm
