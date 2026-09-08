@@ -59,7 +59,7 @@ def main() -> None:
     parser.add_argument("--output_dir", type=Path, default=Path("outputs/all_houses"))
     parser.add_argument("--threshold", type=float, default=None)
     parser.add_argument("--device", default="cuda")
-    parser.add_argument("--batch_size", type=int, default=1)
+    parser.add_argument("--batch_size", type=int, default=4)
     parser.add_argument("--cache_dir", type=Path, default=Path("cache/views_448"))
     parser.add_argument("--amp", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--amp_dtype", choices=("fp16", "bf16"), default="bf16")

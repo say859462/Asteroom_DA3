@@ -11,6 +11,26 @@ from .output import build_pair_record
 from .panorama import PanoramaProjector
 
 
+def connectivity_probabilities(logits: torch.Tensor) -> torch.Tensor:
+    """Match the BF16 sigmoid ordering used to calibrate the checkpoint."""
+    return torch.sigmoid(logits).float()
+
+
+def summarize_view_attention(
+    debug: dict[str, torch.Tensor],
+) -> dict[str, torch.Tensor]:
+    """Return the calibrated evaluator's symmetric six-view marginals."""
+    result: dict[str, torch.Tensor] = {}
+    for side in ("a", "b"):
+        values = debug[f"view_attention_{side}"].float().mean(dim=1)
+        reverse = debug.get(f"reverse_view_attention_{side}")
+        if reverse is not None:
+            values = 0.5 * (values + reverse.float().mean(dim=1))
+        values = values.clamp_min(0.0)
+        result[side] = values / values.sum(dim=-1, keepdim=True).clamp_min(1e-8)
+    return result
+
+
 class CandidatePredictor:
     """Reusable two-panorama connectivity predictor."""
 
@@ -104,21 +124,23 @@ class CandidatePredictor:
                     regions[:, : self.num_views],
                     regions[:, self.num_views :],
                 )
-            probabilities = torch.sigmoid(logits.float()).cpu()
-            preferred = debug["view_pair_scores"].float().flatten(1).argmax(dim=1).cpu()
-            for (path_a, path_b), probability, preferred_index in zip(
+            probabilities = connectivity_probabilities(logits).cpu()
+            view_attention = summarize_view_attention(debug)
+            preferred_a = view_attention["a"].argmax(dim=1).cpu()
+            preferred_b = view_attention["b"].argmax(dim=1).cpu()
+            for (path_a, path_b), probability, view_a, view_b in zip(
                 batch,
                 probabilities,
-                preferred,
+                preferred_a,
+                preferred_b,
             ):
-                index = int(preferred_index)
                 records.append(
                     build_pair_record(
                         str(path_a),
                         str(path_b),
                         float(probability),
-                        index // self.num_views,
-                        index % self.num_views,
+                        int(view_a),
+                        int(view_b),
                     )
                 )
         return records

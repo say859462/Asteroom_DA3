@@ -176,7 +176,7 @@ class QueryEvidenceModel(nn.Module):
         self,
         attention_a: torch.Tensor,
         attention_b: torch.Tensor,
-    ) -> torch.Tensor:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         batch_size = attention_a.shape[0]
         view_attention_a = attention_a.reshape(
             batch_size, self.num_queries, self.num_views, self.num_regions
@@ -186,10 +186,11 @@ class QueryEvidenceModel(nn.Module):
         ).sum(dim=-1)
         query_joint = view_attention_a[:, :, :, None] * view_attention_b[:, :, None, :]
         log_joint = query_joint.float().clamp_min(1e-8).log()
-        return torch.logsumexp(
+        view_pair_scores = torch.logsumexp(
             log_joint / self.query_pool_temperature,
             dim=1,
         ) * self.query_pool_temperature
+        return view_attention_a, view_attention_b, query_joint, view_pair_scores
 
     def forward_symmetric_with_debug(
         self,
@@ -203,6 +204,11 @@ class QueryEvidenceModel(nn.Module):
             debug_ab["view_pair_scores"]
             + debug_ba["view_pair_scores"].transpose(1, 2)
         )
+        debug["reverse_attention_a"] = debug_ba["attention_b"]
+        debug["reverse_attention_b"] = debug_ba["attention_a"]
+        debug["reverse_view_attention_a"] = debug_ba["view_attention_b"]
+        debug["reverse_view_attention_b"] = debug_ba["view_attention_a"]
+        debug["reverse_view_pair_scores"] = debug_ba["view_pair_scores"]
         return 0.5 * (logits_ab + logits_ba), debug
 
     def forward(self, regions_a: torch.Tensor, regions_b: torch.Tensor) -> torch.Tensor:
@@ -276,10 +282,15 @@ class CandidateModelV2(QueryEvidenceModel):
 
         attention_a = attention_a.mean(dim=1)
         attention_b = attention_b.mean(dim=1)
-        view_pair_scores = self._pool_query_view_scores(attention_a, attention_b)
+        view_attention_a, view_attention_b, query_joint, view_pair_scores = (
+            self._pool_query_view_scores(attention_a, attention_b)
+        )
         return logits, {
             "attention_a": attention_a,
             "attention_b": attention_b,
+            "view_attention_a": view_attention_a,
+            "view_attention_b": view_attention_b,
+            "query_view_pair_attention": query_joint,
             "view_pair_scores": view_pair_scores,
             "image_evidence_tokens": image_evidence,
             "evidence_tokens": evidence,

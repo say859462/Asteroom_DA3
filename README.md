@@ -70,13 +70,16 @@ Place the panorama dataset under `Dataset` and its connectivity CSV files under
 `Dataset/Metadatas`. Then run:
 
 ```powershell
-python .\export_all_houses.py --device cuda --batch_size 1
+python .\export_all_houses.py --device cuda --batch_size 4
 ```
 
 The exporter writes one `outputs/all_houses/<house_id>.json` file per house.
 Every panorama pair in each connectivity CSV is retained in `pairs`, including
 pairs below the operating threshold. Existing house outputs are skipped; pass
 `--overwrite` to regenerate them.
+
+The default batch size of 4 matches the validation protocol used to calibrate
+the included checkpoint and threshold.
 
 ## Output convention
 
