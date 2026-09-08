@@ -6,10 +6,9 @@ import torch
 import torch.nn as nn
 
 
-class DA3DINOv2QueryEvidenceModel(nn.Module):
-    """Query-based connectivity head over frozen joint-view DA3 regions."""
+class QueryEvidenceModel(nn.Module):
+    """Connectivity head over frozen joint-view visual regions."""
 
-    architecture_name = "DA3_DINOv2_Joint12_MultiLayer_QueryEvidence_VisualOnly"
     is_intrinsically_symmetric = False
 
     def __init__(
@@ -19,7 +18,7 @@ class DA3DINOv2QueryEvidenceModel(nn.Module):
         hidden_dim: int = 256,
         num_feature_layers: int = 4,
         num_views: int = 6,
-        region_grid: int = 6,
+        region_grid: int = 32,
         num_queries: int = 8,
         transformer_depth: int = 1,
         num_heads: int = 4,
@@ -69,7 +68,9 @@ class DA3DINOv2QueryEvidenceModel(nn.Module):
         )
         self.token_norm = nn.LayerNorm(self.hidden_dim)
 
-        self.evidence_queries = nn.Parameter(torch.empty(1, self.num_queries, self.hidden_dim))
+        self.evidence_queries = nn.Parameter(
+            torch.empty(1, self.num_queries, self.hidden_dim)
+        )
         self.query_norm = nn.LayerNorm(self.hidden_dim)
         self.cross_attention = nn.MultiheadAttention(
             embed_dim=self.hidden_dim,
@@ -89,7 +90,6 @@ class DA3DINOv2QueryEvidenceModel(nn.Module):
             nn.GELU(),
             nn.Dropout(dropout),
         )
-
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=self.hidden_dim,
             nhead=num_heads,
@@ -109,7 +109,6 @@ class DA3DINOv2QueryEvidenceModel(nn.Module):
             nn.LayerNorm(self.hidden_dim),
             nn.Linear(self.hidden_dim, 1),
         )
-
         self.register_buffer(
             "position_features",
             self._build_position_features(),
@@ -149,8 +148,8 @@ class DA3DINOv2QueryEvidenceModel(nn.Module):
         )
         if value.ndim != 5 or tuple(value.shape[1:]) != expected:
             raise ValueError(
-                f"Expected {name} [B,{expected[0]},{expected[1]},{expected[2]},{expected[3]}], "
-                f"got {tuple(value.shape)}"
+                f"Expected {name} [B,{expected[0]},{expected[1]},"
+                f"{expected[2]},{expected[3]}], got {tuple(value.shape)}"
             )
 
     def _tokenize_regions(self, regions: torch.Tensor) -> torch.Tensor:
@@ -163,7 +162,11 @@ class DA3DINOv2QueryEvidenceModel(nn.Module):
             balanced = torch.cat((local, global_context), dim=-1)
             projected_layers.append(self.layer_projections[layer_index](balanced))
         tokens = self.region_norm(torch.cat(projected_layers, dim=-1))
-        tokens = tokens.reshape(tokens.shape[0], self.num_views * self.num_regions, self.hidden_dim)
+        tokens = tokens.reshape(
+            tokens.shape[0],
+            self.num_views * self.num_regions,
+            self.hidden_dim,
+        )
         position = self.position_projection(
             self.position_features.to(device=tokens.device, dtype=tokens.dtype)
         )
@@ -173,7 +176,7 @@ class DA3DINOv2QueryEvidenceModel(nn.Module):
         self,
         attention_a: torch.Tensor,
         attention_b: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> torch.Tensor:
         batch_size = attention_a.shape[0]
         view_attention_a = attention_a.reshape(
             batch_size, self.num_queries, self.num_views, self.num_regions
@@ -183,75 +186,10 @@ class DA3DINOv2QueryEvidenceModel(nn.Module):
         ).sum(dim=-1)
         query_joint = view_attention_a[:, :, :, None] * view_attention_b[:, :, None, :]
         log_joint = query_joint.float().clamp_min(1e-8).log()
-        temperature = self.query_pool_temperature
-        view_pair_scores = torch.logsumexp(log_joint / temperature, dim=1) * temperature
-        return view_attention_a, view_attention_b, query_joint, view_pair_scores
-
-    def forward_with_debug(
-        self,
-        regions_a: torch.Tensor,
-        regions_b: torch.Tensor,
-    ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
-        self._validate_regions(regions_a, "regions_a")
-        self._validate_regions(regions_b, "regions_b")
-        if regions_a.shape[0] != regions_b.shape[0]:
-            raise ValueError("regions_a and regions_b must have the same batch size")
-
-        tokens_a = self._tokenize_regions(regions_a)
-        tokens_b = self._tokenize_regions(regions_b)
-        batch_size = tokens_a.shape[0]
-        queries = self.evidence_queries.expand(batch_size, -1, -1).to(dtype=tokens_a.dtype)
-
-        context_a, attention_a = self.cross_attention(
-            self.query_norm(queries),
-            tokens_a,
-            tokens_a,
-            need_weights=True,
-            average_attn_weights=False,
-        )
-        query_state = self.query_state_norm(queries + self.attention_dropout(context_a))
-        context_b, attention_b = self.cross_attention(
-            self.query_norm(query_state),
-            tokens_b,
-            tokens_b,
-            need_weights=True,
-            average_attn_weights=False,
-        )
-
-        evidence_a = self.context_norm_a(context_a)
-        evidence_b = self.context_norm_b(context_b)
-        pair_features = torch.cat(
-            (
-                evidence_a + evidence_b,
-                (evidence_a - evidence_b).abs(),
-                evidence_a * evidence_b,
-            ),
-            dim=-1,
-        )
-        evidence = self.evidence_projection(pair_features) + queries
-        cls = self.cls_token.expand(batch_size, -1, -1).to(dtype=evidence.dtype)
-        encoded = self.aggregator(torch.cat((cls, evidence), dim=1))
-        logits = self.classifier(encoded[:, 0]).squeeze(-1)
-
-        attention_heads_a = attention_a
-        attention_heads_b = attention_b
-        attention_a = attention_heads_a.mean(dim=1)
-        attention_b = attention_heads_b.mean(dim=1)
-        view_attention_a, view_attention_b, query_joint, view_pair_scores = (
-            self._pool_query_view_scores(attention_a, attention_b)
-        )
-        debug = {
-            "attention_a": attention_a,
-            "attention_b": attention_b,
-            "attention_heads_a": attention_heads_a,
-            "attention_heads_b": attention_heads_b,
-            "view_attention_a": view_attention_a,
-            "view_attention_b": view_attention_b,
-            "query_view_pair_attention": query_joint,
-            "view_pair_scores": view_pair_scores,
-            "evidence_tokens": evidence,
-        }
-        return logits, debug
+        return torch.logsumexp(
+            log_joint / self.query_pool_temperature,
+            dim=1,
+        ) * self.query_pool_temperature
 
     def forward_symmetric_with_debug(
         self,
@@ -262,23 +200,16 @@ class DA3DINOv2QueryEvidenceModel(nn.Module):
         logits_ba, debug_ba = self.forward_with_debug(regions_b, regions_a)
         debug = dict(debug_ab)
         debug["view_pair_scores"] = 0.5 * (
-            debug_ab["view_pair_scores"] + debug_ba["view_pair_scores"].transpose(1, 2)
+            debug_ab["view_pair_scores"]
+            + debug_ba["view_pair_scores"].transpose(1, 2)
         )
-        debug["reverse_attention_a"] = debug_ba["attention_a"]
-        debug["reverse_attention_b"] = debug_ba["attention_b"]
-        # In the reverse pass, B is the first input and A is the second input.
-        debug["reverse_view_attention_a"] = debug_ba["view_attention_b"]
-        debug["reverse_view_attention_b"] = debug_ba["view_attention_a"]
-        debug["reverse_view_pair_scores"] = debug_ba["view_pair_scores"]
         return 0.5 * (logits_ab + logits_ba), debug
 
     def forward(self, regions_a: torch.Tensor, regions_b: torch.Tensor) -> torch.Tensor:
         return self.forward_with_debug(regions_a, regions_b)[0]
 
 
-class ConnectivityModel(DA3DINOv2QueryEvidenceModel):
-    """Best bounded-identity QueryEvidence connectivity model."""
-
+class CandidateModelV2(QueryEvidenceModel):
     architecture_name = (
         "DA3_DINOv2_Joint12_MultiLayer_BoundedIdentityQueryEvidence_VisualOnly"
     )
@@ -306,7 +237,6 @@ class ConnectivityModel(DA3DINOv2QueryEvidenceModel):
         queries = self.evidence_queries.expand(batch_size, -1, -1).to(
             dtype=tokens_a.dtype
         )
-
         context_a, attention_a = self.cross_attention(
             self.query_norm(queries),
             tokens_a,
@@ -340,28 +270,17 @@ class ConnectivityModel(DA3DINOv2QueryEvidenceModel):
         evidence = self.evidence_identity_norm(
             image_evidence + self.query_identity_scale * query_identity
         )
-
         cls = self.cls_token.expand(batch_size, -1, -1).to(dtype=evidence.dtype)
         encoded = self.aggregator(torch.cat((cls, evidence), dim=1))
         logits = self.classifier(encoded[:, 0]).squeeze(-1)
 
-        attention_heads_a = attention_a
-        attention_heads_b = attention_b
-        attention_a = attention_heads_a.mean(dim=1)
-        attention_b = attention_heads_b.mean(dim=1)
-        view_attention_a, view_attention_b, query_joint, view_pair_scores = (
-            self._pool_query_view_scores(attention_a, attention_b)
-        )
-        debug = {
+        attention_a = attention_a.mean(dim=1)
+        attention_b = attention_b.mean(dim=1)
+        view_pair_scores = self._pool_query_view_scores(attention_a, attention_b)
+        return logits, {
             "attention_a": attention_a,
             "attention_b": attention_b,
-            "attention_heads_a": attention_heads_a,
-            "attention_heads_b": attention_heads_b,
-            "view_attention_a": view_attention_a,
-            "view_attention_b": view_attention_b,
-            "query_view_pair_attention": query_joint,
             "view_pair_scores": view_pair_scores,
             "image_evidence_tokens": image_evidence,
             "evidence_tokens": evidence,
         }
-        return logits, debug

@@ -1,44 +1,8 @@
-# Publish only the minimal best-model package.
-/*
-
-# The local interactive tour is a separate application and repository.
-/Model-Predicted-Virtual-Tour/
-
-# Public files.
-!/.gitignore
-!/README.md
-!/requirements.txt
-
-!/src/
-!/src/**
-
-!/checkpoints/
-/checkpoints/*
-!/checkpoints/best_model.pth
-
-!/configs/
-/configs/*
-!/configs/best_model.json
-
-!/results/
-/results/*
-!/results/training_curve.csv
-!/results/training_curve.png
-
-!/splits/
-/splits/*
-!/splits/train.csv
-!/splits/val.csv
-
-# Runtime and generated files override broad source-directory rules.
-**/__pycache__/
-**/*.py[cod]
-**/.git/
-**/.venv/
-**/cache/
-**/outputs/
-**/*.pt
-**/*.log
-
-# Keep only the selected serialized model.
-!/checkpoints/best_model.pth
+__pycache__/
+*.py[cod]
+.venv/
+cache/
+outputs/
+Dataset/
+.idea/
+.vscode/
