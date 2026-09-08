@@ -128,11 +128,15 @@ class CandidatePredictor:
             view_attention = summarize_view_attention(debug)
             preferred_a = view_attention["a"].argmax(dim=1).cpu()
             preferred_b = view_attention["b"].argmax(dim=1).cpu()
-            for (path_a, path_b), probability, view_a, view_b in zip(
+            scores_a = view_attention["a"].cpu()
+            scores_b = view_attention["b"].cpu()
+            for (path_a, path_b), probability, view_a, view_b, score_a, score_b in zip(
                 batch,
                 probabilities,
                 preferred_a,
                 preferred_b,
+                scores_a,
+                scores_b,
             ):
                 records.append(
                     build_pair_record(
@@ -141,6 +145,8 @@ class CandidatePredictor:
                         float(probability),
                         int(view_a),
                         int(view_b),
+                        view_scores_a=score_a.tolist(),
+                        view_scores_b=score_b.tolist(),
                     )
                 )
         return records

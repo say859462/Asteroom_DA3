@@ -28,19 +28,45 @@ def build_pair_record(
     probability: float,
     view_a: int,
     view_b: int,
+    *,
+    view_scores_a: list[float] | None = None,
+    view_scores_b: list[float] | None = None,
 ) -> dict[str, Any]:
     if not 0 <= view_a < len(VIEW_YAWS) or not 0 <= view_b < len(VIEW_YAWS):
         raise ValueError("view indices must be in [0, 5]")
+    corresponding_views: dict[str, Any] = {
+        "view_a": int(view_a),
+        "yaw_a_degrees": VIEW_YAWS[view_a],
+        "view_b": int(view_b),
+        "yaw_b_degrees": VIEW_YAWS[view_b],
+    }
+    if view_scores_a is not None or view_scores_b is not None:
+        if view_scores_a is None or view_scores_b is None:
+            raise ValueError("both view score vectors are required")
+        score_vectors = {
+            "a": [round(float(value), 6) for value in view_scores_a],
+            "b": [round(float(value), 6) for value in view_scores_b],
+        }
+        if any(len(values) != len(VIEW_YAWS) for values in score_vectors.values()):
+            raise ValueError("view score vectors must contain exactly six values")
+        for side, values in score_vectors.items():
+            top_indices = sorted(
+                range(len(values)), key=lambda index: (-values[index], index)
+            )[:2]
+            corresponding_views[f"top2_{side}"] = [
+                {
+                    "view": index,
+                    "yaw_degrees": VIEW_YAWS[index],
+                    "attention_score": values[index],
+                }
+                for index in top_indices
+            ]
+            corresponding_views[f"view_scores_{side}"] = values
     return {
         "pano_a": Path(pano_a).name,
         "pano_b": Path(pano_b).name,
         "probability": round(float(probability), 6),
-        "corresponding_views": {
-            "view_a": int(view_a),
-            "yaw_a_degrees": VIEW_YAWS[view_a],
-            "view_b": int(view_b),
-            "yaw_b_degrees": VIEW_YAWS[view_b],
-        },
+        "corresponding_views": corresponding_views,
     }
 
 
@@ -52,10 +78,20 @@ def build_pair_payload(
     threshold: float,
     view_a: int,
     view_b: int,
+    view_scores_a: list[float] | None = None,
+    view_scores_b: list[float] | None = None,
     image_size: int = 448,
     fov_degrees: float = 100.0,
 ) -> dict[str, Any]:
-    pair = build_pair_record(pano_a, pano_b, probability, view_a, view_b)
+    pair = build_pair_record(
+        pano_a,
+        pano_b,
+        probability,
+        view_a,
+        view_b,
+        view_scores_a=view_scores_a,
+        view_scores_b=view_scores_b,
+    )
     return {
         "threshold": float(threshold),
         "connected": float(probability) >= float(threshold),

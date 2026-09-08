@@ -51,6 +51,8 @@ def main() -> None:
         threshold=threshold,
         view_a=views["view_a"],
         view_b=views["view_b"],
+        view_scores_a=views["view_scores_a"],
+        view_scores_b=views["view_scores_b"],
         image_size=int(predictor.config["image_size"]),
         fov_degrees=float(predictor.config["fov_degrees"]),
     )

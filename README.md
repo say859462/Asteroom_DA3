@@ -37,8 +37,9 @@ precision/recall trade-off is required:
 python .\predict_pair.py pano_a.jpg pano_b.jpg --threshold 0.95
 ```
 
-The output contains the probability, thresholded decision, and preferred view
-correspondence:
+The output contains the probability, thresholded decision, preferred top-1 view,
+ranked top-2 views, and all six normalized attention scores for each panorama.
+The attention scores describe the model readout and are not calibrated probabilities:
 
 ```json
 {
@@ -58,7 +59,17 @@ correspondence:
       "view_a": 1,
       "yaw_a_degrees": 60,
       "view_b": 4,
-      "yaw_b_degrees": 240
+      "yaw_b_degrees": 240,
+      "top2_a": [
+        {"view": 1, "yaw_degrees": 60, "attention_score": 0.42},
+        {"view": 2, "yaw_degrees": 120, "attention_score": 0.35}
+      ],
+      "top2_b": [
+        {"view": 4, "yaw_degrees": 240, "attention_score": 0.47},
+        {"view": 3, "yaw_degrees": 180, "attention_score": 0.31}
+      ],
+      "view_scores_a": [0.03, 0.42, 0.35, 0.08, 0.06, 0.06],
+      "view_scores_b": [0.04, 0.05, 0.07, 0.31, 0.47, 0.06]
     }
   }
 }
