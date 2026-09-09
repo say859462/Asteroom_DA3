@@ -1,0 +1,787 @@
+{
+  "house_id": "DollhouseTask_66790",
+  "threshold": 0.96875,
+  "view_convention": {
+    "num_views": 6,
+    "image_size": 448,
+    "fov_degrees": 100.0,
+    "yaw_range": "0_to_360",
+    "yaw_origin": "equirectangular_image_center",
+    "positive_direction": "toward_image_right",
+    "view_yaw_degrees": [
+      0,
+      60,
+      120,
+      180,
+      240,
+      300
+    ]
+  },
+  "pairs": [
+    {
+      "pano_a": "08ddfaba-cc63-4532-8692-68ed38a5f236.jpg",
+      "pano_b": "08ddfaba-e19e-4bf5-8b74-c718cc2d2756.jpg",
+      "probability": 0.957031,
+      "corresponding_views": {
+        "view_a": 3,
+        "yaw_a_degrees": 180,
+        "view_b": 4,
+        "yaw_b_degrees": 240,
+        "top2_a": [
+          {
+            "view": 3,
+            "yaw_degrees": 180,
+            "attention_score": 0.534433
+          },
+          {
+            "view": 1,
+            "yaw_degrees": 60,
+            "attention_score": 0.166176
+          }
+        ],
+        "view_scores_a": [
+          0.085256,
+          0.166176,
+          0.063417,
+          0.534433,
+          0.113213,
+          0.037505
+        ],
+        "top2_b": [
+          {
+            "view": 4,
+            "yaw_degrees": 240,
+            "attention_score": 0.63134
+          },
+          {
+            "view": 5,
+            "yaw_degrees": 300,
+            "attention_score": 0.289066
+          }
+        ],
+        "view_scores_b": [
+          0.012839,
+          0.011618,
+          0.010236,
+          0.044901,
+          0.63134,
+          0.289066
+        ]
+      }
+    },
+    {
+      "pano_a": "08ddfaba-cc63-4532-8692-68ed38a5f236.jpg",
+      "pano_b": "08ddfaba-f72c-4756-8ccf-0f531154aee6.jpg",
+      "probability": 0.976562,
+      "corresponding_views": {
+        "view_a": 5,
+        "yaw_a_degrees": 300,
+        "view_b": 4,
+        "yaw_b_degrees": 240,
+        "top2_a": [
+          {
+            "view": 5,
+            "yaw_degrees": 300,
+            "attention_score": 0.605322
+          },
+          {
+            "view": 4,
+            "yaw_degrees": 240,
+            "attention_score": 0.274578
+          }
+        ],
+        "view_scores_a": [
+          0.087069,
+          0.001959,
+          0.008806,
+          0.022266,
+          0.274578,
+          0.605322
+        ],
+        "top2_b": [
+          {
+            "view": 4,
+            "yaw_degrees": 240,
+            "attention_score": 0.526758
+          },
+          {
+            "view": 5,
+            "yaw_degrees": 300,
+            "attention_score": 0.403976
+          }
+        ],
+        "view_scores_b": [
+          0.019758,
+          0.007014,
+          0.003621,
+          0.038874,
+          0.526758,
+          0.403976
+        ]
+      }
+    },
+    {
+      "pano_a": "08ddfaba-cc63-4532-8692-68ed38a5f236.jpg",
+      "pano_b": "08ddfabb-04e7-4e13-8633-a39889a21284.jpg",
+      "probability": 0.605469,
+      "corresponding_views": {
+        "view_a": 0,
+        "yaw_a_degrees": 0,
+        "view_b": 4,
+        "yaw_b_degrees": 240,
+        "top2_a": [
+          {
+            "view": 0,
+            "yaw_degrees": 0,
+            "attention_score": 0.483936
+          },
+          {
+            "view": 2,
+            "yaw_degrees": 120,
+            "attention_score": 0.138471
+          }
+        ],
+        "view_scores_a": [
+          0.483936,
+          0.109705,
+          0.138471,
+          0.09514,
+          0.048308,
+          0.124441
+        ],
+        "top2_b": [
+          {
+            "view": 4,
+            "yaw_degrees": 240,
+            "attention_score": 0.515646
+          },
+          {
+            "view": 3,
+            "yaw_degrees": 180,
+            "attention_score": 0.191917
+          }
+        ],
+        "view_scores_b": [
+          0.049072,
+          0.034317,
+          0.047207,
+          0.191917,
+          0.515646,
+          0.161842
+        ]
+      }
+    },
+    {
+      "pano_a": "08ddfaba-cc63-4532-8692-68ed38a5f236.jpg",
+      "pano_b": "08ddfabb-161e-429c-82bd-252139d795f9.jpg",
+      "probability": 0.106934,
+      "corresponding_views": {
+        "view_a": 3,
+        "yaw_a_degrees": 180,
+        "view_b": 3,
+        "yaw_b_degrees": 180,
+        "top2_a": [
+          {
+            "view": 3,
+            "yaw_degrees": 180,
+            "attention_score": 0.360056
+          },
+          {
+            "view": 5,
+            "yaw_degrees": 300,
+            "attention_score": 0.225715
+          }
+        ],
+        "view_scores_a": [
+          0.050679,
+          0.085062,
+          0.093335,
+          0.360056,
+          0.185153,
+          0.225715
+        ],
+        "top2_b": [
+          {
+            "view": 3,
+            "yaw_degrees": 180,
+            "attention_score": 0.415377
+          },
+          {
+            "view": 4,
+            "yaw_degrees": 240,
+            "attention_score": 0.231517
+          }
+        ],
+        "view_scores_b": [
+          0.048166,
+          0.053458,
+          0.174983,
+          0.415377,
+          0.231517,
+          0.076499
+        ]
+      }
+    },
+    {
+      "pano_a": "08ddfaba-cc63-4532-8692-68ed38a5f236.jpg",
+      "pano_b": "08ddfabb-2523-42d5-8f15-cd5e8c306f65.jpg",
+      "probability": 0.121094,
+      "corresponding_views": {
+        "view_a": 3,
+        "yaw_a_degrees": 180,
+        "view_b": 3,
+        "yaw_b_degrees": 180,
+        "top2_a": [
+          {
+            "view": 3,
+            "yaw_degrees": 180,
+            "attention_score": 0.3648
+          },
+          {
+            "view": 5,
+            "yaw_degrees": 300,
+            "attention_score": 0.217707
+          }
+        ],
+        "view_scores_a": [
+          0.09584,
+          0.06385,
+          0.138278,
+          0.3648,
+          0.119525,
+          0.217707
+        ],
+        "top2_b": [
+          {
+            "view": 3,
+            "yaw_degrees": 180,
+            "attention_score": 0.378081
+          },
+          {
+            "view": 2,
+            "yaw_degrees": 120,
+            "attention_score": 0.210166
+          }
+        ],
+        "view_scores_b": [
+          0.041164,
+          0.097909,
+          0.210166,
+          0.378081,
+          0.188673,
+          0.084007
+        ]
+      }
+    },
+    {
+      "pano_a": "08ddfaba-e19e-4bf5-8b74-c718cc2d2756.jpg",
+      "pano_b": "08ddfaba-f72c-4756-8ccf-0f531154aee6.jpg",
+      "probability": 0.202148,
+      "corresponding_views": {
+        "view_a": 4,
+        "yaw_a_degrees": 240,
+        "view_b": 4,
+        "yaw_b_degrees": 240,
+        "top2_a": [
+          {
+            "view": 4,
+            "yaw_degrees": 240,
+            "attention_score": 0.560033
+          },
+          {
+            "view": 5,
+            "yaw_degrees": 300,
+            "attention_score": 0.175553
+          }
+        ],
+        "view_scores_a": [
+          0.068208,
+          0.0545,
+          0.031211,
+          0.110495,
+          0.560033,
+          0.175553
+        ],
+        "top2_b": [
+          {
+            "view": 4,
+            "yaw_degrees": 240,
+            "attention_score": 0.340526
+          },
+          {
+            "view": 5,
+            "yaw_degrees": 300,
+            "attention_score": 0.280056
+          }
+        ],
+        "view_scores_b": [
+          0.111403,
+          0.02536,
+          0.049784,
+          0.19287,
+          0.340526,
+          0.280056
+        ]
+      }
+    },
+    {
+      "pano_a": "08ddfaba-e19e-4bf5-8b74-c718cc2d2756.jpg",
+      "pano_b": "08ddfabb-04e7-4e13-8633-a39889a21284.jpg",
+      "probability": 0.158203,
+      "corresponding_views": {
+        "view_a": 4,
+        "yaw_a_degrees": 240,
+        "view_b": 4,
+        "yaw_b_degrees": 240,
+        "top2_a": [
+          {
+            "view": 4,
+            "yaw_degrees": 240,
+            "attention_score": 0.539804
+          },
+          {
+            "view": 5,
+            "yaw_degrees": 300,
+            "attention_score": 0.25395
+          }
+        ],
+        "view_scores_a": [
+          0.049452,
+          0.036281,
+          0.024823,
+          0.095691,
+          0.539804,
+          0.25395
+        ],
+        "top2_b": [
+          {
+            "view": 4,
+            "yaw_degrees": 240,
+            "attention_score": 0.273603
+          },
+          {
+            "view": 5,
+            "yaw_degrees": 300,
+            "attention_score": 0.217587
+          }
+        ],
+        "view_scores_b": [
+          0.145023,
+          0.143542,
+          0.104242,
+          0.116003,
+          0.273603,
+          0.217587
+        ]
+      }
+    },
+    {
+      "pano_a": "08ddfaba-e19e-4bf5-8b74-c718cc2d2756.jpg",
+      "pano_b": "08ddfabb-161e-429c-82bd-252139d795f9.jpg",
+      "probability": 0.123535,
+      "corresponding_views": {
+        "view_a": 4,
+        "yaw_a_degrees": 240,
+        "view_b": 3,
+        "yaw_b_degrees": 180,
+        "top2_a": [
+          {
+            "view": 4,
+            "yaw_degrees": 240,
+            "attention_score": 0.490905
+          },
+          {
+            "view": 5,
+            "yaw_degrees": 300,
+            "attention_score": 0.220202
+          }
+        ],
+        "view_scores_a": [
+          0.062122,
+          0.032876,
+          0.020682,
+          0.173213,
+          0.490905,
+          0.220202
+        ],
+        "top2_b": [
+          {
+            "view": 3,
+            "yaw_degrees": 180,
+            "attention_score": 0.431304
+          },
+          {
+            "view": 4,
+            "yaw_degrees": 240,
+            "attention_score": 0.26326
+          }
+        ],
+        "view_scores_b": [
+          0.04712,
+          0.060401,
+          0.13996,
+          0.431304,
+          0.26326,
+          0.057954
+        ]
+      }
+    },
+    {
+      "pano_a": "08ddfaba-e19e-4bf5-8b74-c718cc2d2756.jpg",
+      "pano_b": "08ddfabb-2523-42d5-8f15-cd5e8c306f65.jpg",
+      "probability": 0.161133,
+      "corresponding_views": {
+        "view_a": 4,
+        "yaw_a_degrees": 240,
+        "view_b": 3,
+        "yaw_b_degrees": 180,
+        "top2_a": [
+          {
+            "view": 4,
+            "yaw_degrees": 240,
+            "attention_score": 0.545114
+          },
+          {
+            "view": 5,
+            "yaw_degrees": 300,
+            "attention_score": 0.241033
+          }
+        ],
+        "view_scores_a": [
+          0.054416,
+          0.04036,
+          0.0266,
+          0.092477,
+          0.545114,
+          0.241033
+        ],
+        "top2_b": [
+          {
+            "view": 3,
+            "yaw_degrees": 180,
+            "attention_score": 0.370424
+          },
+          {
+            "view": 2,
+            "yaw_degrees": 120,
+            "attention_score": 0.254062
+          }
+        ],
+        "view_scores_b": [
+          0.059641,
+          0.132249,
+          0.254062,
+          0.370424,
+          0.063222,
+          0.120402
+        ]
+      }
+    },
+    {
+      "pano_a": "08ddfaba-f72c-4756-8ccf-0f531154aee6.jpg",
+      "pano_b": "08ddfabb-04e7-4e13-8633-a39889a21284.jpg",
+      "probability": 0.132812,
+      "corresponding_views": {
+        "view_a": 4,
+        "yaw_a_degrees": 240,
+        "view_b": 4,
+        "yaw_b_degrees": 240,
+        "top2_a": [
+          {
+            "view": 4,
+            "yaw_degrees": 240,
+            "attention_score": 0.247748
+          },
+          {
+            "view": 5,
+            "yaw_degrees": 300,
+            "attention_score": 0.242074
+          }
+        ],
+        "view_scores_a": [
+          0.114832,
+          0.076901,
+          0.140707,
+          0.177737,
+          0.247748,
+          0.242074
+        ],
+        "top2_b": [
+          {
+            "view": 4,
+            "yaw_degrees": 240,
+            "attention_score": 0.54037
+          },
+          {
+            "view": 5,
+            "yaw_degrees": 300,
+            "attention_score": 0.202173
+          }
+        ],
+        "view_scores_b": [
+          0.083381,
+          0.027904,
+          0.038555,
+          0.107618,
+          0.54037,
+          0.202173
+        ]
+      }
+    },
+    {
+      "pano_a": "08ddfaba-f72c-4756-8ccf-0f531154aee6.jpg",
+      "pano_b": "08ddfabb-161e-429c-82bd-252139d795f9.jpg",
+      "probability": 0.098145,
+      "corresponding_views": {
+        "view_a": 4,
+        "yaw_a_degrees": 240,
+        "view_b": 3,
+        "yaw_b_degrees": 180,
+        "top2_a": [
+          {
+            "view": 4,
+            "yaw_degrees": 240,
+            "attention_score": 0.218476
+          },
+          {
+            "view": 0,
+            "yaw_degrees": 0,
+            "attention_score": 0.20024
+          }
+        ],
+        "view_scores_a": [
+          0.20024,
+          0.084652,
+          0.16285,
+          0.172291,
+          0.218476,
+          0.161489
+        ],
+        "top2_b": [
+          {
+            "view": 3,
+            "yaw_degrees": 180,
+            "attention_score": 0.360366
+          },
+          {
+            "view": 2,
+            "yaw_degrees": 120,
+            "attention_score": 0.241859
+          }
+        ],
+        "view_scores_b": [
+          0.039149,
+          0.052706,
+          0.241859,
+          0.360366,
+          0.240855,
+          0.065065
+        ]
+      }
+    },
+    {
+      "pano_a": "08ddfaba-f72c-4756-8ccf-0f531154aee6.jpg",
+      "pano_b": "08ddfabb-2523-42d5-8f15-cd5e8c306f65.jpg",
+      "probability": 0.457031,
+      "corresponding_views": {
+        "view_a": 5,
+        "yaw_a_degrees": 300,
+        "view_b": 3,
+        "yaw_b_degrees": 180,
+        "top2_a": [
+          {
+            "view": 5,
+            "yaw_degrees": 300,
+            "attention_score": 0.469164
+          },
+          {
+            "view": 0,
+            "yaw_degrees": 0,
+            "attention_score": 0.165765
+          }
+        ],
+        "view_scores_a": [
+          0.165765,
+          0.078254,
+          0.07281,
+          0.104371,
+          0.109637,
+          0.469164
+        ],
+        "top2_b": [
+          {
+            "view": 3,
+            "yaw_degrees": 180,
+            "attention_score": 0.60284
+          },
+          {
+            "view": 4,
+            "yaw_degrees": 240,
+            "attention_score": 0.210582
+          }
+        ],
+        "view_scores_b": [
+          0.020035,
+          0.026167,
+          0.076853,
+          0.60284,
+          0.210582,
+          0.063523
+        ]
+      }
+    },
+    {
+      "pano_a": "08ddfabb-04e7-4e13-8633-a39889a21284.jpg",
+      "pano_b": "08ddfabb-161e-429c-82bd-252139d795f9.jpg",
+      "probability": 0.147461,
+      "corresponding_views": {
+        "view_a": 4,
+        "yaw_a_degrees": 240,
+        "view_b": 3,
+        "yaw_b_degrees": 180,
+        "top2_a": [
+          {
+            "view": 4,
+            "yaw_degrees": 240,
+            "attention_score": 0.525583
+          },
+          {
+            "view": 5,
+            "yaw_degrees": 300,
+            "attention_score": 0.286527
+          }
+        ],
+        "view_scores_a": [
+          0.06087,
+          0.019173,
+          0.039118,
+          0.068729,
+          0.525583,
+          0.286527
+        ],
+        "top2_b": [
+          {
+            "view": 3,
+            "yaw_degrees": 180,
+            "attention_score": 0.484997
+          },
+          {
+            "view": 4,
+            "yaw_degrees": 240,
+            "attention_score": 0.258612
+          }
+        ],
+        "view_scores_b": [
+          0.041507,
+          0.039437,
+          0.110941,
+          0.484997,
+          0.258612,
+          0.064507
+        ]
+      }
+    },
+    {
+      "pano_a": "08ddfabb-04e7-4e13-8633-a39889a21284.jpg",
+      "pano_b": "08ddfabb-2523-42d5-8f15-cd5e8c306f65.jpg",
+      "probability": 0.148438,
+      "corresponding_views": {
+        "view_a": 5,
+        "yaw_a_degrees": 300,
+        "view_b": 3,
+        "yaw_b_degrees": 180,
+        "top2_a": [
+          {
+            "view": 5,
+            "yaw_degrees": 300,
+            "attention_score": 0.405481
+          },
+          {
+            "view": 4,
+            "yaw_degrees": 240,
+            "attention_score": 0.331087
+          }
+        ],
+        "view_scores_a": [
+          0.131447,
+          0.031998,
+          0.028437,
+          0.07155,
+          0.331087,
+          0.405481
+        ],
+        "top2_b": [
+          {
+            "view": 3,
+            "yaw_degrees": 180,
+            "attention_score": 0.420165
+          },
+          {
+            "view": 2,
+            "yaw_degrees": 120,
+            "attention_score": 0.20241
+          }
+        ],
+        "view_scores_b": [
+          0.089622,
+          0.081957,
+          0.20241,
+          0.420165,
+          0.110641,
+          0.095205
+        ]
+      }
+    },
+    {
+      "pano_a": "08ddfabb-161e-429c-82bd-252139d795f9.jpg",
+      "pano_b": "08ddfabb-2523-42d5-8f15-cd5e8c306f65.jpg",
+      "probability": 0.341797,
+      "corresponding_views": {
+        "view_a": 3,
+        "yaw_a_degrees": 180,
+        "view_b": 3,
+        "yaw_b_degrees": 180,
+        "top2_a": [
+          {
+            "view": 3,
+            "yaw_degrees": 180,
+            "attention_score": 0.443981
+          },
+          {
+            "view": 4,
+            "yaw_degrees": 240,
+            "attention_score": 0.261667
+          }
+        ],
+        "view_scores_a": [
+          0.056661,
+          0.064922,
+          0.133097,
+          0.443981,
+          0.261667,
+          0.039673
+        ],
+        "top2_b": [
+          {
+            "view": 3,
+            "yaw_degrees": 180,
+            "attention_score": 0.53845
+          },
+          {
+            "view": 4,
+            "yaw_degrees": 240,
+            "attention_score": 0.284141
+          }
+        ],
+        "view_scores_b": [
+          0.013594,
+          0.037422,
+          0.100522,
+          0.53845,
+          0.284141,
+          0.025871
+        ]
+      }
+    }
+  ]
+}
