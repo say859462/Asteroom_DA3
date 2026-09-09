@@ -31,7 +31,7 @@ python .\predict_pair.py `
 ```
 
 The default operating threshold is `0.96875`. Override it only when a different
-precision/recall trade-off is required:
+precision/recall trade-off is required: (0.95 is the best)
 
 ```powershell
 python .\predict_pair.py pano_a.jpg pano_b.jpg --threshold 0.95
