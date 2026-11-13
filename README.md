@@ -176,3 +176,5 @@ the included checkpoint and threshold.
 Yaw zero is the horizontal center of the source equirectangular panorama.
 Positive yaw moves toward image-right, and yaw is represented in `[0, 360)`.
 The six view centers are fixed at `0, 60, 120, 180, 240, 300` degrees.
+<img width="875" height="325" alt="image" src="https://github.com/user-attachments/assets/e7bbbf22-70b6-4a2c-8fbd-e46b97c46b0a" />
+
