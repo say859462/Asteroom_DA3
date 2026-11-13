@@ -37,43 +37,122 @@ precision/recall trade-off is required:
 python .\predict_pair.py pano_a.jpg pano_b.jpg --threshold 0.95
 ```
 
-The output contains the probability, thresholded decision, preferred top-1 view,
-ranked top-2 views, and all six normalized attention scores for each panorama.
-The attention scores describe the model readout and are not calibrated probabilities:
+## Model Output
 
-```json
+The model produces a connectivity prediction for a pair of panoramas, along with the preferred corresponding perspective views.
+
+The output includes:
+
+- **Connectivity prediction**: The predicted probability that two panoramas are visually connected.
+- **Corresponding views**: The model-selected perspective view from each panorama.
+- **Top-2 views**: The two highest-ranked perspective views for each panorama.
+- **Attention scores**: Normalized scores indicating the relative importance of each view to the model's prediction.
+
+### Output JSON Example
+
+The following example uses JSONC comments for documentation. The actual output files contain standard JSON without comments.
+
+```jsonc
 {
+  // Decision threshold used to classify panorama connectivity.
+  // Default: 0.96875
   "threshold": 0.96875,
+
+  // Final binary connectivity decision.
+  // True if probability >= threshold; otherwise false.
   "connected": true,
+
+  // Configuration used to project each panorama into perspective views.
   "view_convention": {
-    "num_views": 6,
-    "image_size": 448,
-    "fov_degrees": 100.0,
+    "num_views": 6,        // Number of perspective views per panorama.
+    "image_size": 448,     // Perspective image resolution: 448 x 448.
+    "fov_degrees": 100.0,  // Horizontal field of view in degrees.
+
+    // Yaw angle for each perspective view (0-based index).
     "view_yaw_degrees": [0, 60, 120, 180, 240, 300]
   },
+
   "pair": {
+    // Input panorama filenames.
     "pano_a": "panorama_a.jpg",
     "pano_b": "panorama_b.jpg",
+
+    // Predicted connectivity probability in [0, 1].
+    // Higher values indicate stronger evidence of connectivity.
     "probability": 0.98,
+
     "corresponding_views": {
+      // Preferred corresponding perspective views.
+      // View indices are 0-based (valid range: 0–5).
       "view_a": 1,
       "yaw_a_degrees": 60,
+
       "view_b": 4,
       "yaw_b_degrees": 240,
+
+      // Top-2 ranked views for panorama A.
+      // Ranked by normalized attention score (descending).
       "top2_a": [
-        {"view": 1, "yaw_degrees": 60, "attention_score": 0.42},
-        {"view": 2, "yaw_degrees": 120, "attention_score": 0.35}
+        {
+          "view": 1,              // Perspective view index.
+          "yaw_degrees": 60,      // Corresponding yaw angle.
+          "attention_score": 0.42 // Normalized attention weight.
+        },
+        {
+          "view": 2,
+          "yaw_degrees": 120,
+          "attention_score": 0.35
+        }
       ],
+
+      // Top-2 ranked views for panorama B.
       "top2_b": [
-        {"view": 4, "yaw_degrees": 240, "attention_score": 0.47},
-        {"view": 3, "yaw_degrees": 180, "attention_score": 0.31}
+        {
+          "view": 4,
+          "yaw_degrees": 240,
+          "attention_score": 0.47
+        },
+        {
+          "view": 3,
+          "yaw_degrees": 180,
+          "attention_score": 0.31
+        }
       ],
+
+      // Normalized attention scores for all six views of panorama A.
+      // Array index corresponds to the perspective view index.
       "view_scores_a": [0.03, 0.42, 0.35, 0.08, 0.06, 0.06],
+
+      // Normalized attention scores for all six views of panorama B.
       "view_scores_b": [0.04, 0.05, 0.07, 0.31, 0.47, 0.06]
     }
   }
 }
 ```
+
+### Important Notes
+
+**Connectivity probability**
+
+`probability` represents the model's predicted likelihood that the two panoramas are visually connected. The binary decision is determined by comparing this value against the operating threshold.
+
+**Corresponding perspective views**
+
+`view_a` and `view_b` identify the model's preferred view pair. Each index refers to one of the six perspective projections generated from the corresponding panorama.
+
+For example, `view_a = 1` and `view_b = 4` indicate that the model selects the 60° view from panorama A and the 240° view from panorama B.
+
+These are model predictions and do not guarantee an exact geometric correspondence.
+
+**Attention scores**
+
+`view_scores_a` and `view_scores_b` contain six normalized attention weights, one for each perspective view.
+
+Higher attention scores indicate greater relative contribution to the model's readout. They should **not** be interpreted as calibrated probabilities of view correspondence.
+
+**Negative connectivity predictions**
+
+The model also returns corresponding-view predictions when `connected = false`. However, these view predictions should be treated cautiously because the panoramas may not share meaningful visual overlap.
 
 ## Export every Asteroom house
 
